@@ -1,0 +1,22 @@
+# Environment files
+.env
+.env.*
+!.env.example
+!.env.template
+
+# Node and pycache
+node_modules/
+__pycache__/
+
+# Build
+dist/
+build/
+.next/
+out/
+
+# Logs
+*.log
+
+# OS
+.DS_Store
+Thumbs.db

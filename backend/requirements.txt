@@ -1,0 +1,10 @@
+fastapi
+uvicorn[standard]
+openai
+supabase
+redis
+composio
+elevenlabs
+pydantic
+pydantic-settings
+tenacity
