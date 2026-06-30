@@ -57,6 +57,20 @@ class SupabaseProvider:
         response = await run_in_threadpool(query)
         return getattr(response, "data", None) or []
 
+    async def insert_one(
+        self,
+        table: str,
+        data: dict[str, object],
+        columns: str = "*",
+    ) -> dict[str, object] | None:
+        from starlette.concurrency import run_in_threadpool
+
+        def query() -> object:
+            return self._require_client().table(table).insert(data).select(columns).maybe_single().execute()
+
+        response = await run_in_threadpool(query)
+        return getattr(response, "data", None)
+
     async def update_one(
         self,
         table: str,
@@ -68,6 +82,23 @@ class SupabaseProvider:
 
         def query() -> object:
             request = self._require_client().table(table).update(data).select(columns)
+            for key, value in filters.items():
+                request = request.eq(key, value)
+            return request.maybe_single().execute()
+
+        response = await run_in_threadpool(query)
+        return getattr(response, "data", None)
+
+    async def delete_one(
+        self,
+        table: str,
+        filters: dict[str, object],
+        columns: str = "*",
+    ) -> dict[str, object] | None:
+        from starlette.concurrency import run_in_threadpool
+
+        def query() -> object:
+            request = self._require_client().table(table).delete().select(columns)
             for key, value in filters.items():
                 request = request.eq(key, value)
             return request.maybe_single().execute()

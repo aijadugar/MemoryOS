@@ -30,12 +30,27 @@ class Settings(BaseSettings):
 
     supabase_url: str | None = None
     supabase_key: str | None = None
+    supabase_documents_bucket: str = "documents"
+
+    document_max_file_size_mb: int = 50
+    document_cache_ttl_seconds: int = 300
 
     redis_url: str | None = None
+    integration_cache_ttl_seconds: int = 300
 
     composio_api_key: str | None = None
 
     elevenlabs_api_key: str | None = None
+    elevenlabs_voice_id: str | None = None
+    elevenlabs_tts_model: str = "eleven_multilingual_v2"
+    elevenlabs_stt_model: str = "scribe_v1"
+    elevenlabs_output_format: str = "mp3_44100_128"
+    elevenlabs_stability: float = 0.5
+    elevenlabs_similarity_boost: float = 0.75
+    supabase_voice_bucket: str = "voice"
+    voice_max_audio_size_mb: int = 25
+    voice_audio_url_ttl_seconds: int = 900
+    voice_cache_ttl_seconds: int = 900
 
 
 @lru_cache
