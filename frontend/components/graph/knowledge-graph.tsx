@@ -13,7 +13,7 @@ import ReactFlow, {
 } from 'reactflow'
 import 'reactflow/dist/style.css'
 import { GraphNode as GraphNodeType, GraphEdge as GraphEdgeType } from '@/lib/graph-types'
-import { NODE_TYPE_COLORS } from '@/lib/graph-types'
+import { NODE_TYPE_COLORS, NodeType } from '@/lib/graph-types'
 import { CustomNode } from './custom-node'
 import { GraphControls } from './graph-controls'
 
@@ -48,18 +48,13 @@ export function KnowledgeGraph({
   // Convert graph data to React Flow format
   const initialNodes: Node[] = data.nodes
     .filter((node) => activeFilters.length === 0 || activeFilters.includes(node.type))
-    .map((node, idx) => {
-      const angle = (idx / data.nodes.length) * Math.PI * 2
-      const radius = 300
-      const x = Math.cos(angle) * radius
-      const y = Math.sin(angle) * radius
-
+    .map((node: any) => {
       const isSearchMatch =
         !searchTerm ||
         node.label.toLowerCase().includes(searchTerm.toLowerCase()) ||
         node.id.toLowerCase().includes(searchTerm.toLowerCase())
 
-      const color = NODE_TYPE_COLORS[node.type]
+      const color = NODE_TYPE_COLORS[node.type as NodeType]
 
       return {
         id: node.id,
@@ -68,7 +63,7 @@ export function KnowledgeGraph({
           type: node.type,
           selected: selectedNodeId === node.id,
         },
-        position: { x, y },
+        position: node.position || { x: 0, y: 0 },
         type: 'custom',
         selected: selectedNodeId === node.id,
         style: {
@@ -104,6 +99,11 @@ export function KnowledgeGraph({
 
   const [nodes, setNodes, onNodesChange] = useNodesState(initialNodes)
   const [edges, setEdges, onEdgesChange] = useEdgesState(initialEdges)
+
+  useEffect(() => {
+    setNodes(initialNodes)
+    setEdges(initialEdges)
+  }, [data, searchTerm, activeFilters, selectedNodeId, setEdges, setNodes])
 
   // Update nodes when selection or search changes
   useEffect(() => {

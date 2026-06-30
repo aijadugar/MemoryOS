@@ -3,14 +3,16 @@
 import { useState, useMemo } from 'react'
 import { motion } from 'framer-motion'
 import { Search } from 'lucide-react'
-import { integrations as defaultIntegrations } from '@/lib/integration-mock-data'
 import { IntegrationCard } from '@/components/integrations/integration-card'
 import { Input } from '@/components/ui/input'
+import { useIntegrations } from '@/hooks/useIntegrations'
+import type { Integration } from '@/lib/integration-types'
 
 type IntegrationStatus = 'all' | 'connected' | 'disconnected' | 'pending' | 'error'
 
 export default function IntegrationsPage() {
-  const [integrations, setIntegrations] = useState(defaultIntegrations)
+  const { integrations: integrationsQuery, status, connect, disconnect } = useIntegrations()
+  const integrations: Integration[] = integrationsQuery.data || []
   const [searchQuery, setSearchQuery] = useState('')
   const [statusFilter, setStatusFilter] = useState<IntegrationStatus>('all')
   const [categoryFilter, setCategoryFilter] = useState<string>('all')
@@ -19,7 +21,7 @@ export default function IntegrationsPage() {
   const statuses: IntegrationStatus[] = ['all', 'connected', 'disconnected', 'pending', 'error']
 
   const filteredIntegrations = useMemo(() => {
-    return integrations.filter((integration) => {
+    return integrations.filter((integration: Integration) => {
       const matchesSearch =
         integration.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
         integration.description.toLowerCase().includes(searchQuery.toLowerCase())
@@ -32,38 +34,14 @@ export default function IntegrationsPage() {
     })
   }, [integrations, searchQuery, statusFilter, categoryFilter])
 
-  const handleConnect = (id: string) => {
-    setIntegrations((prev) =>
-      prev.map((int) =>
-        int.id === id
-          ? {
-              ...int,
-              status: 'connected' as const,
-              lastSync: 'just now',
-            }
-          : int
-      )
-    )
-  }
+  const handleConnect = (id: string) => connect.mutate(id)
 
-  const handleDisconnect = (id: string) => {
-    setIntegrations((prev) =>
-      prev.map((int) =>
-        int.id === id
-          ? {
-              ...int,
-              status: 'disconnected' as const,
-              lastSync: undefined,
-            }
-          : int
-      )
-    )
-  }
+  const handleDisconnect = (id: string) => disconnect.mutate(id)
 
   const stats = {
     total: integrations.length,
-    connected: integrations.filter((i) => i.status === 'connected').length,
-    synced: integrations.reduce((sum, i) => sum + i.statistics.synced, 0),
+    connected: status.data?.connected ?? integrations.filter((i: Integration) => i.status === 'connected').length,
+    synced: integrations.reduce((sum: number, i: Integration) => sum + i.statistics.synced, 0),
   }
 
   return (
@@ -175,12 +153,14 @@ export default function IntegrationsPage() {
 
       {/* Integration Cards Grid */}
       <div className="flex-1 overflow-y-auto px-4 lg:px-8 py-6 lg:py-8">
-        {filteredIntegrations.length > 0 ? (
+        {integrationsQuery.isLoading ? (
+          <div className="text-muted-foreground">Loading integrations...</div>
+        ) : filteredIntegrations.length > 0 ? (
           <motion.div
             layout
             className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4"
           >
-            {filteredIntegrations.map((integration, index) => (
+            {filteredIntegrations.map((integration: Integration, index: number) => (
               <motion.div
                 key={integration.id}
                 initial={{ opacity: 0, y: 20 }}

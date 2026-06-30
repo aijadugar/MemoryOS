@@ -3,15 +3,16 @@
 import React, { useMemo, useState } from 'react'
 import { motion } from 'framer-motion'
 import { Menu, X } from 'lucide-react'
-import { createMockGraphData } from '@/lib/graph-mock-data'
 import { NodeType } from '@/lib/graph-types'
 import { KnowledgeGraph } from '@/components/graph/knowledge-graph'
 import { NodeFilters } from '@/components/graph/node-filters'
 import { NodeDetailsDrawer } from '@/components/graph/node-details-drawer'
 import { Button } from '@/components/ui/button'
+import { useGraph } from '@/hooks/useGraph'
 
 export default function GraphPage() {
-  const graphData = useMemo(() => createMockGraphData(), [])
+  const { graph } = useGraph()
+  const graphData = graph.data || { nodes: [], edges: [] }
   const [selectedNodeId, setSelectedNodeId] = useState<string | null>(null)
   const [searchQuery, setSearchQuery] = useState('')
   const [activeFilters, setActiveFilters] = useState<NodeType[]>([
@@ -135,7 +136,7 @@ export default function GraphPage() {
       <div className="flex-1 relative overflow-hidden pt-16 lg:pt-0">
         <KnowledgeGraph
           data={graphData}
-          selectedNodeId={selectedNodeId}
+          selectedNodeId={selectedNodeId || undefined}
           onNodeSelect={handleNodeSelect}
           searchQuery={searchQuery}
           activeFilters={activeFilters}

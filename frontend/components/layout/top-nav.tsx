@@ -13,16 +13,26 @@ import {
 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { useTheme } from '@/components/theme-provider'
-import { mockNotifications } from '@/lib/mock-data'
+import { useDashboard } from '@/hooks/useDashboard'
 
 type Theme = 'light' | 'dark' | 'system'
 
 export function TopNav() {
   const { theme, toggleTheme } = useTheme()
+  const { activity } = useDashboard()
   const [notificationsOpen, setNotificationsOpen] = useState(false)
-  const [unreadCount, setUnreadCount] = useState(
-    mockNotifications.filter((n) => !n.read).length
-  )
+  const notifications = (activity.data || []).slice(0, 5).map((item: any) => ({
+    id: `${item.type}-${item.timestamp}`,
+    type: item.type,
+    title: item.title,
+    description: item.type,
+    timestamp: new Date(item.timestamp),
+  }))
+  const [unreadCount, setUnreadCount] = useState(0)
+
+  useEffect(() => {
+    setUnreadCount(notifications.length)
+  }, [notifications.length])
 
   return (
     <motion.header
@@ -103,7 +113,10 @@ export function TopNav() {
                   <h3 className="font-semibold text-sm">Notifications</h3>
                 </div>
                 <div className="max-h-96 overflow-y-auto">
-                  {mockNotifications.map((notification) => (
+                  {notifications.length === 0 && (
+                    <div className="px-4 py-3 text-sm text-muted-foreground">No recent activity</div>
+                  )}
+                  {notifications.map((notification: any) => (
                     <motion.div
                       key={notification.id}
                       whileHover={{ backgroundColor: 'rgba(0,0,0,0.02)' }}

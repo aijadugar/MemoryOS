@@ -1,18 +1,19 @@
 'use client'
 
-import { useState, useCallback, useEffect, useRef } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import { TimelineEvent, EventType, Priority, Source } from '@/lib/timeline-types'
-import { mockTimelineEvents, generateMoreEvents } from '@/lib/timeline-mock-data'
 import { EventCard } from '@/components/timeline/event-card'
 import { TimelineFilters } from '@/components/timeline/timeline-filters'
 import { Input } from '@/components/ui/input'
 import { Button } from '@/components/ui/button'
 import { motion } from 'framer-motion'
 import { Search, ChevronDown } from 'lucide-react'
+import { mapTimelineEvent, useTimeline } from '@/hooks/useTimeline'
 
 export default function TimelinePage() {
-  const [events, setEvents] = useState<TimelineEvent[]>(mockTimelineEvents)
-  const [filteredEvents, setFilteredEvents] = useState<TimelineEvent[]>(mockTimelineEvents)
+  const { events: timelineQuery } = useTimeline()
+  const events = (timelineQuery.data?.pages.flatMap((page) => page.events) || []).map(mapTimelineEvent)
+  const [filteredEvents, setFilteredEvents] = useState<TimelineEvent[]>([])
   const [searchQuery, setSearchQuery] = useState('')
   const [selectedTypes, setSelectedTypes] = useState<Set<EventType>>(new Set())
   const [selectedPriorities, setSelectedPriorities] = useState<Set<Priority>>(new Set())
@@ -22,9 +23,7 @@ export default function TimelinePage() {
     start: null,
     end: null,
   })
-  const [isLoading, setIsLoading] = useState(false)
   const observerTarget = useRef<HTMLDivElement>(null)
-  const nextIdRef = useRef(mockTimelineEvents.length + 1)
 
   // Get unique workspaces
   const availableWorkspaces = Array.from(new Set(events.map((e) => e.workspace).filter(Boolean))) as string[]
@@ -83,14 +82,8 @@ export default function TimelinePage() {
   useEffect(() => {
     const observer = new IntersectionObserver(
       (entries) => {
-        if (entries[0].isIntersecting && !isLoading) {
-          setIsLoading(true)
-          setTimeout(() => {
-            const newEvents = generateMoreEvents(nextIdRef.current, 10)
-            nextIdRef.current += 10
-            setEvents((prev) => [...prev, ...newEvents])
-            setIsLoading(false)
-          }, 500)
+        if (entries[0].isIntersecting && timelineQuery.hasNextPage && !timelineQuery.isFetchingNextPage) {
+          timelineQuery.fetchNextPage()
         }
       },
       { threshold: 0.1 }
@@ -105,7 +98,7 @@ export default function TimelinePage() {
         observer.unobserve(observerTarget.current)
       }
     }
-  }, [isLoading])
+  }, [timelineQuery])
 
   const handleTypeChange = (type: EventType) => {
     setSelectedTypes((prev) => {
@@ -229,7 +222,7 @@ export default function TimelinePage() {
 
           {/* Infinite scroll trigger */}
           <div ref={observerTarget} className="flex items-center justify-center py-8">
-            {isLoading && (
+            {(timelineQuery.isLoading || timelineQuery.isFetchingNextPage) && (
               <motion.div animate={{ rotate: 360 }} transition={{ duration: 1, repeat: Infinity }} className="text-muted-foreground">
                 <ChevronDown className="h-6 w-6" />
               </motion.div>

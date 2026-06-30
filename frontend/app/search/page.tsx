@@ -1,9 +1,18 @@
 'use client'
 
-import { mockMemories } from '@/lib/mock-data'
 import { motion } from 'framer-motion'
 import { Search, Brain } from 'lucide-react'
 import { useState } from 'react'
+import { useDashboard } from '@/hooks/useDashboard'
+
+type MemoryCard = {
+  id: string
+  title: string
+  category: string
+  description: string
+  tags: string[]
+  timestamp: Date
+}
 
 const containerVariants = {
   hidden: { opacity: 0 },
@@ -27,13 +36,22 @@ const itemVariants = {
 
 export default function SearchPage() {
   const [searchQuery, setSearchQuery] = useState('')
+  const { recent } = useDashboard()
+  const memories: MemoryCard[] = (recent.data?.memories || []).map((memory: any) => ({
+    id: memory.id,
+    title: memory.metadata?.title || memory.content?.slice(0, 48) || 'Memory',
+    category: memory.metadata?.category || memory.metadata?.type || 'Memory',
+    description: memory.content || memory.summary || '',
+    tags: memory.metadata?.tags || [],
+    timestamp: new Date(memory.created_at),
+  }))
 
   const results = searchQuery.trim()
-    ? mockMemories.filter(
-        (memory) =>
+    ? memories.filter(
+        (memory: MemoryCard) =>
           memory.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
           memory.description.toLowerCase().includes(searchQuery.toLowerCase()) ||
-          memory.tags.some((tag) =>
+          memory.tags.some((tag: string) =>
             tag.toLowerCase().includes(searchQuery.toLowerCase())
           )
       )
@@ -94,7 +112,7 @@ export default function SearchPage() {
               Found {results.length} result{results.length !== 1 ? 's' : ''}
             </p>
 
-            {results.map((memory, idx) => (
+            {results.map((memory: MemoryCard) => (
               <motion.div
                 key={memory.id}
                 whileHover={{ x: 4 }}
@@ -115,7 +133,7 @@ export default function SearchPage() {
                       {memory.description}
                     </p>
                     <div className="flex flex-wrap gap-2">
-                      {memory.tags.map((tag) => (
+                      {memory.tags.map((tag: string) => (
                         <span
                           key={tag}
                           className={`text-xs px-3 py-1 rounded-full transition-colors ${

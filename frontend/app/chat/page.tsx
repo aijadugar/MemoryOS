@@ -1,34 +1,36 @@
 'use client'
 
-import { useState, useCallback } from 'react'
+import { useState, useCallback, useEffect } from 'react'
 import { Conversation } from '@/lib/chat-types'
-import { mockConversations } from '@/lib/chat-mock-data'
 import { ConversationSidebar } from '@/components/chat/conversation-sidebar'
 import { ChatWindow } from '@/components/chat/chat-window'
+import { useChat } from '@/hooks/useChat'
 
 export default function ChatPage() {
-  const [conversations, setConversations] = useState<Conversation[]>(
-    mockConversations
-  )
-  const [activeConversationId, setActiveConversationId] = useState<string>(
-    mockConversations[0]?.id || ''
-  )
+  const { history, sendMessage, title } = useChat()
+  const [localConversations, setLocalConversations] = useState<Conversation[]>([])
+  const conversations = localConversations.length ? localConversations : history.data || []
+  const [activeConversationId, setActiveConversationId] = useState('')
   const [sidebarOpen, setSidebarOpen] = useState(false)
 
-  const activeConversation = conversations.find(
-    (c) => c.id === activeConversationId
-  )
+  useEffect(() => {
+    if (!activeConversationId && conversations[0]?.id) {
+      setActiveConversationId(conversations[0].id)
+    }
+  }, [activeConversationId, conversations])
+
+  const activeConversation = conversations.find((c) => c.id === activeConversationId)
 
   const handleNewChat = useCallback(() => {
     const newConversation: Conversation = {
-      id: Date.now().toString(),
+      id: `local-${Date.now()}`,
       title: 'New Chat',
       messages: [],
       createdAt: new Date(),
       updatedAt: new Date(),
       isBookmarked: false,
     }
-    setConversations((prev) => [newConversation, ...prev])
+    setLocalConversations((prev) => [newConversation, ...prev])
     setActiveConversationId(newConversation.id)
     setSidebarOpen(false)
   }, [])
@@ -39,90 +41,107 @@ export default function ChatPage() {
   }, [])
 
   const handleDeleteConversation = useCallback((id: string) => {
-    setConversations((prev) => prev.filter((c) => c.id !== id))
+    setLocalConversations((prev) => prev.filter((c) => c.id !== id))
     if (activeConversationId === id) {
-      const remaining = conversations.filter((c) => c.id !== id)
-      setActiveConversationId(remaining[0]?.id || '')
+      setActiveConversationId(conversations.filter((c) => c.id !== id)[0]?.id || '')
     }
   }, [activeConversationId, conversations])
 
   const handleToggleBookmark = useCallback((id: string) => {
-    setConversations((prev) =>
-      prev.map((c) =>
-        c.id === id ? { ...c, isBookmarked: !c.isBookmarked } : c
-      )
+    setLocalConversations((prev) =>
+      prev.map((c) => (c.id === id ? { ...c, isBookmarked: !c.isBookmarked } : c))
     )
   }, [])
 
   const handleSendMessage = useCallback(
     (content: string, files?: File[]) => {
-      if (!activeConversation) return
+      const conversation =
+        activeConversation ||
+        ({
+          id: `local-${Date.now()}`,
+          title: 'New Chat',
+          messages: [],
+          createdAt: new Date(),
+          updatedAt: new Date(),
+          isBookmarked: false,
+        } satisfies Conversation)
 
-      const newMessage = {
-        id: Date.now().toString(),
+      if (!activeConversation) {
+        setLocalConversations((prev) => [conversation, ...prev])
+        setActiveConversationId(conversation.id)
+      }
+
+      const userMessage = {
+        id: `${Date.now()}-user`,
         role: 'user' as const,
         content,
         timestamp: new Date(),
-        files: files?.map((f) => ({
-          name: f.name,
-          type: f.type,
-          size: f.size,
-        })),
+        files: files?.map((file) => ({ name: file.name, type: file.type, size: file.size })),
       }
 
-      setConversations((prev) =>
+      setLocalConversations((prev) =>
         prev.map((c) =>
-          c.id === activeConversationId
-            ? {
-                ...c,
-                messages: [...c.messages, newMessage],
-                updatedAt: new Date(),
-              }
+          c.id === conversation.id
+            ? { ...c, messages: [...c.messages, userMessage], updatedAt: new Date() }
             : c
         )
       )
 
-      // Update conversation title if it's "New Chat"
-      if (activeConversation.title === 'New Chat') {
-        const titlePreview = content.substring(0, 30)
-        setConversations((prev) =>
-          prev.map((c) =>
-            c.id === activeConversationId
-              ? { ...c, title: titlePreview }
-              : c
-          )
-        )
-      }
+      sendMessage.mutate(
+        { message: content, conversationId: conversation.id.startsWith('local-') ? undefined : conversation.id },
+        {
+          onSuccess: async (response) => {
+            const backendConversationId = response.conversation_id || conversation.id
+            const assistantMessage = {
+              id: `${Date.now()}-assistant`,
+              role: 'assistant' as const,
+              content: response.message,
+              timestamp: new Date(response.timestamp),
+            }
 
-      // Simulate assistant response after a delay
-      setTimeout(() => {
-        const assistantMessage = {
-          id: (Date.now() + 1).toString(),
-          role: 'assistant' as const,
-          content:
-            'I understand. This is a demonstration of the chat interface. In a real implementation, this would be connected to an AI backend service.',
-          timestamp: new Date(),
+            setLocalConversations((prev) =>
+              prev.map((c) =>
+                c.id === conversation.id
+                  ? {
+                      ...c,
+                      id: backendConversationId,
+                      messages: [...c.messages, assistantMessage],
+                      updatedAt: new Date(),
+                    }
+                  : c
+              )
+            )
+            setActiveConversationId(backendConversationId)
+
+            if (conversation.title === 'New Chat') {
+              const titleResponse = await title.mutateAsync(content).catch(() => null)
+              if (titleResponse?.title) {
+                setLocalConversations((prev) =>
+                  prev.map((c) => (c.id === backendConversationId ? { ...c, title: titleResponse.title } : c))
+                )
+              }
+            }
+          },
+          onError: (error: any) => {
+            const assistantMessage = {
+              id: `${Date.now()}-error`,
+              role: 'assistant' as const,
+              content: error?.message || 'Unable to send message right now.',
+              timestamp: new Date(),
+              error: error?.message,
+            }
+            setLocalConversations((prev) =>
+              prev.map((c) => (c.id === conversation.id ? { ...c, messages: [...c.messages, assistantMessage] } : c))
+            )
+          },
         }
-
-        setConversations((prev) =>
-          prev.map((c) =>
-            c.id === activeConversationId
-              ? {
-                  ...c,
-                  messages: [...c.messages, assistantMessage],
-                  updatedAt: new Date(),
-                }
-              : c
-          )
-        )
-      }, 1500)
+      )
     },
-    [activeConversation, activeConversationId]
+    [activeConversation, sendMessage, title]
   )
 
   return (
     <div className="flex h-full overflow-hidden bg-background">
-      {/* Sidebar */}
       <ConversationSidebar
         conversations={conversations}
         activeConversationId={activeConversationId}
@@ -134,7 +153,6 @@ export default function ChatPage() {
         onClose={() => setSidebarOpen(false)}
       />
 
-      {/* Main Chat Area */}
       <ChatWindow
         conversation={activeConversation}
         onSendMessage={handleSendMessage}
