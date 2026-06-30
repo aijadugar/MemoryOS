@@ -8,3 +8,6 @@ elevenlabs
 pydantic
 pydantic-settings
 tenacity
+python-multipart
+PyMuPDF
+python-docx

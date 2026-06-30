@@ -50,6 +50,13 @@ def get_memory_provider():
     return MockMemoryProvider(redis_provider=redis_provider)
 
 
+@lru_cache
+def get_storage_provider():
+    from providers.storage_provider import StorageProvider
+
+    return StorageProvider(settings=get_settings(), supabase_provider=get_supabase_provider())
+
+
 def get_auth_service():
     from services.auth_service import AuthService
 
@@ -89,28 +96,95 @@ def get_memory_service():
 def get_dashboard_service():
     from services.dashboard_service import DashboardService
 
-    return DashboardService()
+    return DashboardService(
+        memory_service=get_memory_service(),
+        workspace_service=get_workspace_service(),
+        user_service=get_user_service(),
+        llm_service=get_llm_service(),
+    )
 
 
 def get_timeline_service():
-    from services.timeline_service import TimelineService
+    from services.timeline_service import (
+        ChatEventProvider,
+        MemoryEventProvider,
+        TimelineService,
+        UserActivityEventProvider,
+        WorkspaceActivityEventProvider,
+    )
 
-    return TimelineService()
+    return TimelineService(
+        event_providers=[
+            ChatEventProvider(memory_service=get_memory_service()),
+            MemoryEventProvider(memory_service=get_memory_service()),
+            UserActivityEventProvider(user_service=get_user_service()),
+            WorkspaceActivityEventProvider(workspace_service=get_workspace_service()),
+        ],
+    )
 
 
 def get_graph_service():
+    from providers.graph_provider import MockGraphProvider
     from services.graph_service import GraphService
 
-    return GraphService()
+    try:
+        redis_provider = get_redis_provider()
+    except ModuleNotFoundError:
+        redis_provider = None
+
+    return GraphService(
+        graph_provider=MockGraphProvider(
+            memory_service=get_memory_service(),
+            workspace_service=get_workspace_service(),
+            user_service=get_user_service(),
+            supabase_provider=get_supabase_provider(),
+        ),
+        redis_provider=redis_provider,
+    )
 
 
 def get_voice_service():
     from services.voice_service import VoiceService
 
-    return VoiceService(elevenlabs_provider=get_elevenlabs_provider())
+    try:
+        redis_provider = get_redis_provider()
+    except ModuleNotFoundError:
+        redis_provider = None
+
+    return VoiceService(
+        settings=get_settings(),
+        chat_service=get_chat_service(),
+        llm_service=get_llm_service(),
+        memory_service=get_memory_service(),
+        elevenlabs_provider=get_elevenlabs_provider(),
+        storage_provider=get_storage_provider(),
+        redis_provider=redis_provider,
+    )
 
 
 def get_integration_service():
     from services.integration_service import IntegrationService
 
-    return IntegrationService(composio_provider=get_composio_provider())
+    try:
+        redis_provider = get_redis_provider()
+    except ModuleNotFoundError:
+        redis_provider = None
+
+    return IntegrationService(composio_provider=get_composio_provider(), redis_provider=redis_provider)
+
+
+def get_document_service():
+    from services.document_service import DocumentService
+
+    try:
+        redis_provider = get_redis_provider()
+    except ModuleNotFoundError:
+        redis_provider = None
+
+    return DocumentService(
+        settings=get_settings(),
+        supabase_provider=get_supabase_provider(),
+        storage_provider=get_storage_provider(),
+        llm_service=get_llm_service(),
+        redis_provider=redis_provider,
+    )
