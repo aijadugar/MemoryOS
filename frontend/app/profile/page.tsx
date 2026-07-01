@@ -4,9 +4,18 @@ import { useState } from 'react'
 import { motion } from 'framer-motion'
 import { Copy, LogOut, Lock, Smartphone, Download } from 'lucide-react'
 import { Button } from '@/components/ui/button'
+import { useWorkspace } from '@/hooks/useWorkspace'
+import { useIntegrations } from '@/hooks/useIntegrations'
+import type { Integration } from '@/lib/integration-types'
 
 export default function ProfilePage() {
   const [activeTab, setActiveTab] = useState('overview')
+  const { me, workspace, summary } = useWorkspace()
+  const { integrations } = useIntegrations()
+  const user = me.data?.data
+  const workspaceData = workspace.data?.data
+  const workspaceSummary = summary.data?.data
+  const connectedAccounts: Integration[] = (integrations.data || []).filter((integration: Integration) => integration.status === 'connected')
 
   const tabs = [
     { id: 'overview', label: 'Overview' },
@@ -30,10 +39,10 @@ export default function ProfilePage() {
   ]
 
   const apiUsage = [
-    { endpoint: '/api/memories', calls: '2,543', limit: '10,000', percentUsed: 25 },
-    { endpoint: '/api/search', calls: '1,842', limit: '5,000', percentUsed: 37 },
-    { endpoint: '/api/integrations', calls: '342', limit: '2,000', percentUsed: 17 },
-    { endpoint: '/api/chat', calls: '5,124', limit: '15,000', percentUsed: 34 },
+    { endpoint: '/api/v1/workspace', calls: String(workspaceSummary?.members ?? 0), limit: 'members', percentUsed: 0 },
+    { endpoint: '/api/v1/dashboard', calls: String(workspaceSummary?.total_memories ?? 0), limit: 'memories', percentUsed: 0 },
+    { endpoint: '/api/v1/documents', calls: String(workspaceSummary?.total_documents ?? 0), limit: 'documents', percentUsed: 0 },
+    { endpoint: '/api/v1/integrations', calls: String(workspaceSummary?.total_integrations ?? 0), limit: 'integrations', percentUsed: 0 },
   ]
 
   return (
@@ -42,12 +51,12 @@ export default function ProfilePage() {
         <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.5 }}>
           <div className="flex items-center gap-6 mb-8">
             <div className="w-24 h-24 rounded-full bg-primary flex items-center justify-center">
-              <span className="text-3xl font-bold text-white">AS</span>
+              <span className="text-3xl font-bold text-white">{(user?.display_name || user?.email || 'ME').slice(0, 2).toUpperCase()}</span>
             </div>
             <div>
-              <h1 className="text-3xl font-bold text-foreground">Alex Smith</h1>
-              <p className="text-muted-foreground">alex@memoryo.com</p>
-              <p className="text-sm text-muted-foreground mt-1">Pro Plan • Member since Jan 2024</p>
+              <h1 className="text-3xl font-bold text-foreground">{user?.display_name || 'MemoryOS User'}</h1>
+              <p className="text-muted-foreground">{user?.email || 'Signed in with Supabase'}</p>
+              <p className="text-sm text-muted-foreground mt-1">{workspaceData?.current_plan || 'Current'} Plan</p>
             </div>
           </div>
         </motion.div>
@@ -82,7 +91,7 @@ export default function ProfilePage() {
                     <div>
                       <div className="flex justify-between mb-2">
                         <span className="text-sm text-muted-foreground">Storage Used</span>
-                        <span className="text-sm font-medium text-foreground">2.4 GB / 5 GB</span>
+                        <span className="text-sm font-medium text-foreground">{workspaceSummary?.total_documents ?? 0} documents</span>
                       </div>
                       <div className="w-full bg-muted rounded-full h-2">
                         <div className="bg-primary h-2 rounded-full w-[48%]"></div>
@@ -91,7 +100,7 @@ export default function ProfilePage() {
                     <div>
                       <div className="flex justify-between mb-2">
                         <span className="text-sm text-muted-foreground">API Calls</span>
-                        <span className="text-sm font-medium text-foreground">9,851 / 50,000</span>
+                        <span className="text-sm font-medium text-foreground">{workspaceSummary?.total_chats ?? 0} chats</span>
                       </div>
                       <div className="w-full bg-muted rounded-full h-2">
                         <div className="bg-blue-500 h-2 rounded-full w-[19%]"></div>
@@ -105,15 +114,15 @@ export default function ProfilePage() {
                   <div className="space-y-3">
                     <div className="flex justify-between">
                       <span className="text-muted-foreground">Current Plan</span>
-                      <span className="font-medium text-foreground">Pro Annual</span>
+                      <span className="font-medium text-foreground">{workspaceData?.current_plan || 'Current'}</span>
                     </div>
                     <div className="flex justify-between">
                       <span className="text-muted-foreground">Next Billing</span>
-                      <span className="font-medium text-foreground">Jan 15, 2025</span>
+                      <span className="font-medium text-foreground">{workspaceData?.created_at ? new Date(workspaceData.created_at).toLocaleDateString() : 'Not available'}</span>
                     </div>
                     <div className="flex justify-between">
                       <span className="text-muted-foreground">Integrations</span>
-                      <span className="font-medium text-foreground">8 / Unlimited</span>
+                      <span className="font-medium text-foreground">{workspaceSummary?.total_integrations ?? 0}</span>
                     </div>
                     <div className="pt-4">
                       <Button className="w-full" variant="outline">
@@ -127,9 +136,9 @@ export default function ProfilePage() {
               <div className="bg-card border border-border rounded-lg p-6">
                 <h3 className="font-semibold text-foreground mb-4">Connected Accounts</h3>
                 <div className="space-y-3">
-                  {['GitHub', 'Gmail', 'Slack', 'Google Drive'].map((account) => (
-                    <div key={account} className="flex items-center justify-between p-3 bg-muted rounded-lg">
-                      <span className="text-sm font-medium text-foreground">{account}</span>
+                  {connectedAccounts.map((account: Integration) => (
+                    <div key={account.id} className="flex items-center justify-between p-3 bg-muted rounded-lg">
+                      <span className="text-sm font-medium text-foreground">{account.name}</span>
                       <Button size="sm" variant="ghost">
                         Disconnect
                       </Button>
@@ -147,11 +156,11 @@ export default function ProfilePage() {
                 <div className="space-y-4">
                   <div>
                     <label className="text-sm text-muted-foreground">Workspace Name</label>
-                    <p className="font-medium text-foreground">MemoryOS Workspace</p>
+                    <p className="font-medium text-foreground">{workspaceData?.name || workspaceSummary?.workspace_name || 'MemoryOS Workspace'}</p>
                   </div>
                   <div>
                     <label className="text-sm text-muted-foreground">Members</label>
-                    <p className="font-medium text-foreground">3 members</p>
+                    <p className="font-medium text-foreground">{workspaceData?.members_count ?? workspaceSummary?.members ?? 0} members</p>
                   </div>
                 </div>
               </div>

@@ -6,6 +6,7 @@ import { useTheme } from '@/components/theme-provider'
 import { Sun, Moon, Monitor, Copy, Check, Bell, Lock, Brain, Mic, AlertTriangle, Download, LogOut } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { useState } from 'react'
+import { useWorkspace } from '@/hooks/useWorkspace'
 
 const containerVariants = {
   hidden: { opacity: 0 },
@@ -27,10 +28,24 @@ const itemVariants = {
   },
 }
 
+type SettingsState = {
+  emailNotifications: boolean
+  slackNotifications: boolean
+  soundAlerts: boolean
+  memoryAutoSave: boolean
+  dailySummaries: boolean
+  voiceEnabled: boolean
+  voiceAutoplay: boolean
+  twoFactor: boolean
+}
+
 export default function SettingsPage() {
   const { theme, toggleTheme } = useTheme()
+  const { workspace, summary } = useWorkspace()
+  const workspaceData = workspace.data?.data
+  const workspaceSummary = summary.data?.data
   const [copied, setCopied] = useState<string | null>(null)
-  const [settings, setSettings] = useState({
+  const [settings, setSettings] = useState<SettingsState>({
     emailNotifications: true,
     slackNotifications: false,
     soundAlerts: true,
@@ -47,7 +62,7 @@ export default function SettingsPage() {
     setTimeout(() => setCopied(null), 2000)
   }
 
-  const toggleSetting = (key: string) => {
+  const toggleSetting = (key: keyof SettingsState) => {
     setSettings((prev) => ({ ...prev, [key]: !prev[key] }))
   }
 
@@ -131,7 +146,8 @@ export default function SettingsPage() {
               <label className="text-sm font-medium text-foreground">Workspace Name</label>
               <input
                 type="text"
-                defaultValue="MemoryOS Workspace"
+                value={workspaceData?.name || workspaceSummary?.workspace_name || 'MemoryOS Workspace'}
+                readOnly
                 className="w-full mt-2 px-3 py-2 bg-muted border border-border rounded-lg focus:outline-none focus:ring-2 focus:ring-accent/50"
               />
             </div>
@@ -139,7 +155,7 @@ export default function SettingsPage() {
               <label className="text-sm font-medium text-foreground">Members</label>
               <input
                 type="text"
-                defaultValue="3 members"
+                value={`${workspaceData?.members_count ?? workspaceSummary?.members ?? 0} members`}
                 disabled
                 className="w-full mt-2 px-3 py-2 bg-muted border border-border rounded-lg opacity-60 cursor-not-allowed"
               />
@@ -173,7 +189,7 @@ export default function SettingsPage() {
                   <p className="text-xs text-muted-foreground">{item.desc}</p>
                 </div>
                 <button
-                  onClick={() => toggleSetting(item.key)}
+                  onClick={() => toggleSetting(item.key as keyof SettingsState)}
                   className={`px-4 py-2 rounded-lg font-medium text-sm transition-all ${
                     settings[item.key as keyof typeof settings]
                       ? 'bg-primary text-white'
@@ -241,7 +257,7 @@ export default function SettingsPage() {
                   <p className="text-xs text-muted-foreground">{item.desc}</p>
                 </div>
                 <button
-                  onClick={() => toggleSetting(item.key)}
+                  onClick={() => toggleSetting(item.key as keyof SettingsState)}
                   className={`px-4 py-2 rounded-lg font-medium text-sm transition-all ${
                     settings[item.key as keyof typeof settings]
                       ? 'bg-primary text-white'
@@ -280,7 +296,7 @@ export default function SettingsPage() {
                   <p className="text-xs text-muted-foreground">{item.desc}</p>
                 </div>
                 <button
-                  onClick={() => toggleSetting(item.key)}
+                  onClick={() => toggleSetting(item.key as keyof SettingsState)}
                   className={`px-4 py-2 rounded-lg font-medium text-sm transition-all ${
                     settings[item.key as keyof typeof settings]
                       ? 'bg-primary text-white'

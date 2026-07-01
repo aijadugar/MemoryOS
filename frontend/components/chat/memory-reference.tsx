@@ -2,7 +2,7 @@
 
 import { motion } from 'framer-motion'
 import { ChevronRight, BookOpen } from 'lucide-react'
-import { MemoryReference } from '@/lib/chat-types'
+import type { MemoryReference } from '@/lib/chat-types'
 
 interface MemoryReferenceProps {
   memory: MemoryReference

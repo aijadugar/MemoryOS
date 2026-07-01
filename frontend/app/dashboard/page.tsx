@@ -1,11 +1,12 @@
 'use client'
 
 import { config } from '@/lib/config'
-import { mockStats, mockMemories } from '@/lib/mock-data'
 import { motion } from 'framer-motion'
 import { TrendingUp, TrendingDown, Brain } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import Link from 'next/link'
+import { useDashboard } from '@/hooks/useDashboard'
+import { getApiErrorMessage } from '@/lib/api'
 
 const containerVariants = {
   hidden: { opacity: 0 },
@@ -28,6 +29,16 @@ const itemVariants = {
 }
 
 export default function Dashboard() {
+  const { summary, stats, recent } = useDashboard()
+  const statCards = [
+    { label: 'Documents', value: stats.data?.documents ?? 0, change: 'Live from backend', positive: true },
+    { label: 'Memories', value: stats.data?.memories ?? 0, change: 'Live from backend', positive: true },
+    { label: 'Conversations', value: stats.data?.conversations ?? 0, change: 'Live from backend', positive: true },
+    { label: 'Integrations', value: stats.data?.integrations ?? 0, change: 'Live from backend', positive: true },
+  ]
+  const memories = recent.data?.memories ?? []
+  const error = summary.error || stats.error || recent.error
+
   return (
     <motion.div
       variants={containerVariants}
@@ -39,7 +50,7 @@ export default function Dashboard() {
       <motion.section variants={itemVariants}>
         <div className="flex flex-col gap-2">
           <h1 className="text-3xl lg:text-4xl font-bold text-foreground">
-            Welcome to {config.appName}
+            {summary.data?.welcome_message || `Welcome to ${config.appName}`}
           </h1>
           <p className="text-muted-foreground text-lg">
             Your intelligent memory management platform. Organize, search, and leverage your memories.
@@ -49,8 +60,9 @@ export default function Dashboard() {
 
       {/* Stats grid */}
       <motion.section variants={itemVariants}>
+        {error && <p className="text-sm text-destructive mb-3">{getApiErrorMessage(error)}</p>}
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-          {mockStats.map((stat, idx) => (
+          {(stats.isLoading ? Array.from({ length: 4 }, () => ({ label: 'Loading', value: '...', change: 'Loading...', positive: true })) : statCards).map((stat, idx) => (
             <motion.div
               key={idx}
               whileHover={{ y: -4 }}
@@ -104,7 +116,11 @@ export default function Dashboard() {
         </div>
 
         <div className="space-y-3">
-          {mockMemories.slice(0, 3).map((memory, idx) => (
+          {recent.isLoading ? (
+            <div className="bg-card border border-border rounded-lg p-4 text-muted-foreground">Loading recent memories...</div>
+          ) : memories.length === 0 ? (
+            <div className="bg-card border border-border rounded-lg p-4 text-muted-foreground">No recent memories found</div>
+          ) : memories.slice(0, 3).map((memory: any) => (
             <motion.div
               key={memory.id}
               whileHover={{ x: 4 }}
@@ -118,14 +134,14 @@ export default function Dashboard() {
                       {memory.title}
                     </h3>
                     <span className="text-xs px-2 py-1 rounded-full bg-accent/10 text-accent flex-shrink-0">
-                      {memory.category}
+                      {memory.category || 'Memory'}
                     </span>
                   </div>
                   <p className="text-sm text-muted-foreground line-clamp-1 mb-2">
-                    {memory.description}
+                    {memory.description || memory.content || memory.summary || ''}
                   </p>
                   <div className="flex flex-wrap gap-2">
-                    {memory.tags.map((tag) => (
+                    {(memory.tags || []).map((tag: string) => (
                       <span key={tag} className="text-xs px-2 py-1 rounded bg-muted text-muted-foreground">
                         #{tag}
                       </span>
@@ -133,7 +149,7 @@ export default function Dashboard() {
                   </div>
                 </div>
                 <p className="text-xs text-muted-foreground flex-shrink-0">
-                  {formatDate(memory.timestamp)}
+                  {formatDate(new Date(memory.created_at || memory.timestamp))}
                 </p>
               </div>
             </motion.div>

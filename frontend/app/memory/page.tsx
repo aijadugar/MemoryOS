@@ -1,10 +1,19 @@
 'use client'
 
-import { mockMemories } from '@/lib/mock-data'
 import { motion } from 'framer-motion'
 import { Plus, Filter, Brain, Trash2 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { useState } from 'react'
+import { useDashboard } from '@/hooks/useDashboard'
+
+type MemoryCard = {
+  id: string
+  title: string
+  category: string
+  description: string
+  tags: string[]
+  timestamp: Date
+}
 
 const containerVariants = {
   hidden: { opacity: 0 },
@@ -28,12 +37,21 @@ const itemVariants = {
 
 export default function MemoryPage() {
   const [selectedCategory, setSelectedCategory] = useState<string | null>(null)
+  const { recent } = useDashboard()
+  const memories: MemoryCard[] = (recent.data?.memories || []).map((memory: any) => ({
+    id: memory.id,
+    title: memory.metadata?.title || memory.content?.slice(0, 48) || 'Memory',
+    category: memory.metadata?.category || memory.metadata?.type || 'Memory',
+    description: memory.content || memory.summary || '',
+    tags: memory.metadata?.tags || [],
+    timestamp: new Date(memory.created_at),
+  }))
 
-  const categories = [...new Set(mockMemories.map((m) => m.category))]
+  const categories: string[] = [...new Set(memories.map((m: MemoryCard) => m.category))]
 
   const filtered = selectedCategory
-    ? mockMemories.filter((m) => m.category === selectedCategory)
-    : mockMemories
+    ? memories.filter((m: MemoryCard) => m.category === selectedCategory)
+    : memories
 
   return (
     <motion.div
@@ -89,13 +107,15 @@ export default function MemoryPage() {
       {/* Memories list */}
       <motion.section variants={itemVariants}>
         <div className="space-y-3">
-          {filtered.length === 0 ? (
+          {recent.isLoading ? (
+            <div className="text-center py-12 text-muted-foreground">Loading memories...</div>
+          ) : filtered.length === 0 ? (
             <div className="text-center py-12">
               <Brain className="h-12 w-12 text-muted-foreground/50 mx-auto mb-4" />
               <p className="text-muted-foreground">No memories found</p>
             </div>
           ) : (
-            filtered.map((memory, idx) => (
+            filtered.map((memory: MemoryCard) => (
               <motion.div
                 key={memory.id}
                 whileHover={{ x: 4 }}
@@ -116,7 +136,7 @@ export default function MemoryPage() {
                       {memory.description}
                     </p>
                     <div className="flex flex-wrap gap-2">
-                      {memory.tags.map((tag) => (
+                      {memory.tags.map((tag: string) => (
                         <span
                           key={tag}
                           className="text-xs px-3 py-1 rounded-full bg-muted text-muted-foreground hover:bg-muted/80 transition-colors"
@@ -151,7 +171,7 @@ export default function MemoryPage() {
           <div className="bg-card border border-border rounded-lg p-4">
             <p className="text-sm text-muted-foreground">Total Memories</p>
             <p className="text-2xl font-bold text-foreground mt-2">
-              {mockMemories.length}
+              {memories.length}
             </p>
           </div>
           <div className="bg-card border border-border rounded-lg p-4">
@@ -163,7 +183,7 @@ export default function MemoryPage() {
           <div className="bg-card border border-border rounded-lg p-4">
             <p className="text-sm text-muted-foreground">Total Tags</p>
             <p className="text-2xl font-bold text-foreground mt-2">
-              {new Set(mockMemories.flatMap((m) => m.tags)).size}
+              {new Set(memories.flatMap((m: MemoryCard) => m.tags)).size}
             </p>
           </div>
         </div>

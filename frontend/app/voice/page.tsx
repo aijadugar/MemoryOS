@@ -1,30 +1,19 @@
 'use client'
 
-import { useState } from 'react'
+import { useRef, useState } from 'react'
 import { motion } from 'framer-motion'
 import { Mic, Square, Copy, Volume2, Trash2, Plus } from 'lucide-react'
 import { Button } from '@/components/ui/button'
+import { useVoice } from '@/hooks/useVoice'
 
 export default function VoicePage() {
   const [isRecording, setIsRecording] = useState(false)
   const [transcript, setTranscript] = useState('')
-  const [history, setHistory] = useState<{ id: string; text: string; timestamp: string }[]>([
-    {
-      id: '1',
-      text: 'Create a meeting reminder for tomorrow at 2 PM',
-      timestamp: '2 hours ago',
-    },
-    {
-      id: '2',
-      text: 'Search for email from John about Q4 planning',
-      timestamp: '5 hours ago',
-    },
-    {
-      id: '3',
-      text: 'Add this to my memory: Project deadline is next Friday',
-      timestamp: '1 day ago',
-    },
-  ])
+  const [audioUrl, setAudioUrl] = useState('')
+  const [history, setHistory] = useState<{ id: string; text: string; timestamp: string }[]>([])
+  const recorderRef = useRef<MediaRecorder | null>(null)
+  const chunksRef = useRef<Blob[]>([])
+  const { chat, speechToText, textToSpeech } = useVoice()
 
   const quickCommands = [
     'Create a reminder',
@@ -35,17 +24,37 @@ export default function VoicePage() {
     'Save note',
   ]
 
-  const handleStartRecording = () => {
+  const handleStartRecording = async () => {
+    const stream = await navigator.mediaDevices.getUserMedia({ audio: true })
+    const recorder = new MediaRecorder(stream)
+    chunksRef.current = []
+    recorder.ondataavailable = (event) => {
+      if (event.data.size) chunksRef.current.push(event.data)
+    }
+    recorder.onstop = async () => {
+      stream.getTracks().forEach((track) => track.stop())
+      const audio = new Blob(chunksRef.current, { type: 'audio/webm' })
+      const response = await speechToText.mutateAsync(audio).catch((error: any) => {
+        setTranscript(error?.message || 'Unable to transcribe audio.')
+        return null
+      })
+      const text = response?.data?.transcript
+      if (text) {
+        setTranscript(text)
+        setHistory((prev) => [{ id: Date.now().toString(), text, timestamp: 'just now' }, ...prev])
+        const chatResponse = await chat.mutateAsync({ text, audio }).catch(() => null)
+        if (chatResponse?.data?.audio_url) setAudioUrl(chatResponse.data.audio_url)
+      }
+    }
+    recorderRef.current = recorder
+    recorder.start()
     setIsRecording(true)
     setTranscript('Listening...')
-    setTimeout(() => {
-      setIsRecording(false)
-      setTranscript('Create a meeting reminder for tomorrow at 2 PM with the team')
-    }, 3000)
   }
 
   const handleStopRecording = () => {
     setIsRecording(false)
+    recorderRef.current?.stop()
   }
 
   const handleCopy = () => {
@@ -54,6 +63,12 @@ export default function VoicePage() {
 
   const handleClearHistory = (id: string) => {
     setHistory(history.filter((h) => h.id !== id))
+  }
+
+  const handlePlay = async () => {
+    const url = audioUrl || (await textToSpeech.mutateAsync(transcript)).data?.audio_url
+    setAudioUrl(url)
+    new Audio(url).play()
   }
 
   return (
@@ -119,7 +134,7 @@ export default function VoicePage() {
                         <Copy size={16} className="mr-2" />
                         Copy
                       </Button>
-                      <Button size="sm" variant="outline">
+                      <Button size="sm" variant="outline" onClick={handlePlay}>
                         <Volume2 size={16} className="mr-2" />
                         Play
                       </Button>
